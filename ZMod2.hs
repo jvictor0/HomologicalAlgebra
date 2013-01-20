@@ -1,8 +1,10 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, GeneralizedNewtypeDeriving, NoImplicitPrelude #-}
 module ZMod2 where
 
-import Prelude hiding ((+),(-),(*),negate,fromInteger,sum,product)
-import AlgebraicStructure
+import NumericPrelude
+import qualified Algebra.Additive as Additive
+import qualified Algebra.Ring as Ring
+import qualified Algebra.Field as Field
 import Utils
 import Data.Array.Unboxed
 import System.Random
@@ -12,19 +14,17 @@ newtype ZMod2 = ZMod2 Bool deriving (IArray UArray, Eq, Ord)
 instance Show ZMod2 where
   show (ZMod2 b) = if b then "1" else "0"
 
-instance AbelianGroup ZMod2 where
+instance Additive.C ZMod2 where
   (+) = ZMod2 .-. (xor `on` (==one))
   negate = id
   zero = ZMod2 False
   
-instance Monoid ZMod2 where
+instance Ring.C ZMod2 where
   (*) = ZMod2 .-. ((&&) `on` (==one))
   one = ZMod2 True
-  
-instance Ring ZMod2 where
-  fromInteger = ZMod2 . odd
+  fromInteger n = ZMod2 $ odd n
 
-instance Field ZMod2 where
+instance Field.C ZMod2 where
   x / y = if y == one then x else error "Z/2 Divide by Zero"
   
 instance Random ZMod2 where

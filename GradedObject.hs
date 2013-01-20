@@ -1,28 +1,29 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts, MultiParamTypeClasses, RebindableSyntax, NoImplicitPrelude, RankNTypes, ScopedTypeVariables #-}
 module GradedObject where
 
-import Prelude hiding ((+),(-),(*),negate,fromInteger,sum,product)
-import AlgebraicStructure
+import NumericPrelude
 import FreeModule
 import qualified Data.Map as Map
 import Utils 
-import Instances
 import Data.List
 
 class Graded g where
   grading :: g -> Int
   
-class BiGraded g where
+class (Graded g) => BiGraded g where
   biGrading :: g -> (Int,Int)
+  biGrading g = (grading g, internalGrading g)
+  internalGrading :: g -> Int
+  internalGrading = snd.biGrading
   
+    
 totalGrading :: (BiGraded g) => g -> Int
 totalGrading g = let (s,t) = biGrading g in s+t
 
-englishLetters :: [String]
-englishLetters = map return ['A'..'Z']
+stableGrading :: (BiGraded g) => g -> Int
+stableGrading g = let (s,t) = biGrading g in s-t
 
-letters :: [String]
-letters = "i":(englishLetters ++ (concatMap (\ls -> map (ls++) englishLetters) $ tail letters))
+
 
 instance (Graded g) => Graded (FreeModule g r) where
   grading m = case nub $ map (grading.fst) $ toAList m of

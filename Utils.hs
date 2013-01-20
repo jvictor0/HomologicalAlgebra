@@ -1,6 +1,10 @@
+{-# LANGUAGE RebindableSyntax, NoImplicitPrelude #-}
 module Utils where
 
-import Data.List
+import NumericPrelude
+import Data.List hiding (product)
+import Data.Array.MArray
+
 
 xor True = not
 xor False = id
@@ -32,3 +36,24 @@ safeHead (x:xs) = Just x
 
 safeTail [] = Nothing
 safeTail (x:xs) = Just xs
+
+maybeIf True x = Just x
+maybeIf False _ = Nothing
+
+maybeZero Nothing = zero
+maybeZero (Just x) = x
+
+findM pred [] = return Nothing
+findM pred (x:xs) = (pred x) >>= (\b -> if b then return $ Just x else findM pred xs)
+
+fact :: Int -> Integer
+fact n = product [1..fromIntegral n]
+
+choose 0 0 = 1
+choose 0 k = 0
+choose n k
+  | k > n || n < 0 || k < 0  = 0
+choose n k = (fact n) `div` ((fact k) * (fact $ n - k))
+
+
+modifyArray arr i fun = readArray arr i >>= (\x -> writeArray arr i (fun x))

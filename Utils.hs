@@ -4,7 +4,7 @@ module Utils where
 import NumericPrelude
 import Data.List hiding (product)
 import Data.Array.MArray
-
+import qualified Data.Map as Map
 
 xor True = not
 xor False = id
@@ -37,6 +37,9 @@ safeHead (x:xs) = Just x
 safeTail [] = Nothing
 safeTail (x:xs) = Just xs
 
+safeFromJust str Nothing = error str
+safeFromJust _ (Just x) = x
+
 maybeIf True x = Just x
 maybeIf False _ = Nothing
 
@@ -55,5 +58,30 @@ choose n k
   | k > n || n < 0 || k < 0  = 0
 choose n k = (fact n) `div` ((fact k) * (fact $ n - k))
 
+powerOf :: Int -> Int -> Bool
+powerOf _ 0 = False
+powerOf n i = n^(round $ logBase (fromIntegral n :: Double) (fromIntegral i :: Double)) == i
+
+dropLast n = reverse . (drop n) . reverse
+
+splitSubstr str ls = sst [] ls
+  where sst fst [] = (reverse fst,[])
+        sst fst rst = if take n rst == str
+                      then (reverse fst,drop n rst)
+                      else sst ((head rst):fst) (tail rst)
+        n = length str
+
+class UnShow u where
+  unShow :: String -> u
+
+evens [] = []
+evens [x] = [x]
+evens (x:_:xs) = x:(evens xs)
+
+odds [] = []
+odds x = evens $ tail x 
 
 modifyArray arr i fun = readArray arr i >>= (\x -> writeArray arr i (fun x))
+
+partitionsBy valToKey list = map snd $ Map.toList 
+                             $ foldr (\elt mp -> Map.insertWith (++) (valToKey elt) [elt] mp) Map.empty list

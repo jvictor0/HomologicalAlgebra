@@ -28,6 +28,7 @@ import qualified PermutationAlgorithms as PermAlgs
 import qualified Algebra.Monoid as Monoid
 import qualified Data.Map as Map
 
+
 -- We wish to create a Free Module datatype
 data FreeModule b r = FM (Map.Map b r) deriving (Eq,Ord)
 
@@ -45,7 +46,23 @@ instance (Ord m,Ring.C r, Eq r, Show m,Show r) => Show (FreeModule m r) where
    | otherwise = cim " + " (\(g,r) -> (rrshow r) ++ (rshow g)) $ toAList v
     where rrshow r = if r == one then "" else rshow r
 
-
+instance (Ring.C r, Ord m, Eq r, Read m, Read r) => Read (FreeModule m r) where
+  readsPrec _ ('0':rst) = [(zero,rst)]
+  readsPrec n term = case firstTm of
+    [] -> []
+    [(f,r)] -> case words r of
+      (('+':tm):rst) -> case readsPrec n (unwords $ tm:rst) of
+        [(g,s)] -> [(f+g,s)]
+        []      -> []
+      _              -> firstTm
+    where firstTm = case readParen False (readsPrec n) term of
+            [] -> case readsPrec n term of
+              [(mod,rst)] -> [(toFModule mod,rst)]
+              []          -> []
+            [(rng,modStr)] -> case readsPrec n modStr of
+              [(mod,rst)] -> [(fromAList [(mod,rng)],rst)]
+              []          -> []
+      
 coefOf :: (Eq r,Ord m,Ring.C r) => (FreeModule m r) -> m -> r
 coefOf (FM m) b = case Map.lookup b m of
   Nothing  -> zero
@@ -61,6 +78,7 @@ toFModule m = fromAList [(m,one)]
 fromAList :: (Ord m,Ring.C r, Eq r) => [(m,r)] -> FreeModule m r
 fromAList ls  = FM $ Map.filter (/=zero) $ foldr (\(m,r) mp -> Map.insertWith (+) m r mp) Map.empty ls
 
+toBasisList m = map fst $ toAList m
 
 vmap :: (Ord m', Ring.C r', Eq r')
         => ((m,r) -> (m',r')) -> FreeModule m r -> FreeModule m' r'
@@ -103,3 +121,11 @@ recompose basis vect
     in Matrix.numRows vect == (b-a+1) && Matrix.numColumns vect == 1 = 
     sum $ zipWith (\[v] b -> v *> (toFModule b)) (Matrix.rows vect) (elems basis)
   | otherwise  = error "cannot recompose matrix or vector from wrong sized basis"
+                 
+linearMatrix src targ fun = Matrix.fromColumns (d-c+1) (b-a+1) $ 
+  map (\e -> let fe = fun $ toFModule e
+             in map (coefOf fe) $ elems targ)
+  $ elems src
+  where (a,b) = bounds src
+        (c,d) = bounds targ
+        

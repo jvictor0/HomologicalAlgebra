@@ -28,17 +28,16 @@ import qualified PermutationAlgorithms as PermAlgs
 import qualified Algebra.Monoid as Monoid
 import qualified Data.Map as Map
 import FreeModule
-
+import Tensor
 
 class (Ring.C k,Eq k, Ord g) => AlgebraGenerator g k where
   (<*>) :: g -> g -> FreeModule g k
   idt :: FreeModule g k
   
-{-
-instance (Monoid.C m, Ring.C k, Eq k, Ord m) => AlgebraGenerator m k where
-  x <*> y = toFModule $ x Monoid.<*> y 
-  idt = toFModule $ Monoid.idt
--}
+
+instance (AlgebraGenerator m k, AlgebraGenerator n k) => AlgebraGenerator (Tensor m n) k where
+  (Tensor x1 x2)<*>(Tensor y1 y2) = (x1<*>y1)`tensor`(x2<*>y2)
+  idt = idt`tensor`idt
 
 -- r had best be a commutative ring for this to really make sence
 instance (AlgebraGenerator m r, Ord m, Ring.C r, Eq r) => Ring.C (FreeModule m r) where

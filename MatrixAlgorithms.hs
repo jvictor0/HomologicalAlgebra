@@ -24,7 +24,7 @@ import Data.Array.Unsafe
 import qualified PermutationAlgorithms as PermAlgs
 import qualified Algebra.ZeroTestable as ZeroTestable
 import qualified Data.Map as Map
-
+import ZMod2
 
 swapRowsMA arr i j = do
   ((0,0),(m,n)) <-  getBounds arr
@@ -73,10 +73,11 @@ rref mat = runSTMatrix mat $ \arr -> do
           when (target/=zero) $ clearRowMA arr (i-nzc) k i
               
 inverse mat 
-  | Matrix.numColumns mat == Matrix.numRows mat = maybeIf (one == Matrix.index mat (n-1) (n-1))
-                                                  $ MatrixUtils.subMatrix mat (n,2*n-1) (n,2*n-1)
+  | (0,0) == (Matrix.dimension mat) = Just mat
+  | Matrix.numColumns mat == Matrix.numRows mat = maybeIf (one == Matrix.index rrefAugMat (n-1) (n-1))
+                                                  $ MatrixUtils.subMatrix rrefAugMat (0,n) (n-1,2*n-1)
  where n = Matrix.numRows mat 
-       augmentedMatrix = MatrixUtils.concat (Matrix.one n) mat
+       augmentedMatrix = MatrixUtils.concat  mat (Matrix.one n)
        rrefAugMat = rref augmentedMatrix
            
 inverseTest mat = case inverse mat of
@@ -117,7 +118,7 @@ kernel mat = Matrix.fromColumns n nullity result
 -- subspace must be a BASIS, else this will not quite work.
 -- will return basis for the matrix^{-1}(subspace)
 -- this of course includes matrix^{-1}(0) = ker(matrix)
-subspacePreimage matrix subspace = MatrixUtils.subMatrix k
+subspacePreimage matrix subspace =  MatrixUtils.subMatrix k
                                    (0,0) (Matrix.numColumns matrix-1,Matrix.numColumns k-1)
   where k = kernel $ MatrixUtils.concat matrix subspace
 
@@ -220,10 +221,20 @@ characteristicPolynomial mat = determinantPID $ (fmap Poly.const mat) - lambdaI
         lambdaI = Matrix.scale lambda (Matrix.one n) 
 
 
-intersection matlst = image $ MatrixUtils.concats matlst
-v `intersects` w = (Matrix.numColumns $ intersection [v,w]) > 0
+intersection a b = a*(MatrixUtils.subMatrix ker (0,0) (Matrix.numColumns a -1,Matrix.numColumns ker-1))
+  where ker = kernel $ MatrixUtils.concat a b
+intersections (a:rst) = foldr intersection a rst
+v `intersects` w = (Matrix.numColumns $ intersection v w) > 0
 
 wikipediaMatrix = Matrix.fromColumns 5 4 [[1,2,1,1],[3,7,5,2],[1,3,3,0],[4,9,1,8]] :: Matrix.T (Ratio.T Integer)
 
 smallMat = Matrix.fromColumns 2 2 [[4,6],[3,3]] :: Matrix.T (Ratio.T Integer)
 
+randomMatrixFullRank m n = rmfr $ Matrix.fromColumns m 0 []
+  where rmfr mat = do
+          rm <- MatrixUtils.randomMatrix m (n-Matrix.numColumns mat)
+          let rk = image $ MatrixUtils.concat mat rm 
+          if Matrix.numColumns rk < minimum [m,n]
+          then do
+           rmfr rk
+          else return rk

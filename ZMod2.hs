@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, GeneralizedNewtypeDeriving, NoImplicitPrelude #-}
+{-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, GeneralizedNewtypeDeriving, NoImplicitPrelude, RebindableSyntax #-}
 module ZMod2 where
 
 import NumericPrelude
@@ -13,6 +13,11 @@ newtype ZMod2 = ZMod2 Bool deriving (IArray UArray, Eq, Ord)
 
 instance Show ZMod2 where
   show (ZMod2 b) = if b then "1" else "0"
+
+instance Read ZMod2 where
+  readsPrec _ ('0':rst) = [(0,rst)]
+  readsPrec _ ('1':rst) = [(1,rst)]
+  readsPrec _ _ = []
 
 instance Additive.C ZMod2 where
   (+) = ZMod2 .-. (xor `on` (==one))

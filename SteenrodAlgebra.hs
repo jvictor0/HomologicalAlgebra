@@ -11,6 +11,7 @@ import Data.Array
 import Data.List
 import Data.Char
 import qualified Algebra.Monoid as Monoid
+import Debug.Trace
 
 data SteenrodSquare = Sq [Int] deriving (Eq, Ord)
 
@@ -19,16 +20,28 @@ instance Show SteenrodSquare where
   show (Sq [x]) = "Sq^" ++ (texShow x)
   show (Sq ls) = "Sq^{\\{" ++ (cim "," show ls ) ++ "\\}}"
 
-{-
-instance Read SteenrodSquare where
+instance UnShow SteenrodSquare where
   unShow "1" = Sq[]
   unShow str = if take (length "Sq^{\\{") str == "Sq^{\\{"
                then Sq $ read $ "[" ++ (dropLast (length "\\}}") $ drop (length "Sq^{\\{") str) ++ "]"
                else if isDigit $ last str
                     then Sq [read [last str]]
                     else Sq [read $ (init $ drop (length "Sq^{") str)]
--}
 
+instance Read SteenrodSquare where
+  readsPrec n (' ':rst) = readsPrec n rst
+  readsPrec _ ('S':'q':'^':n:rst) | isDigit n = [(Sq [read [n]],rst)]
+  readsPrec _ ('S':'q':'^':'{':longNum) 
+    | let (digs,rst) = break (not.isDigit) longNum
+      in (not $ null rst) && ('}' == (head rst)) = [(Sq [read $ takeWhile isDigit longNum],tail $ dropWhile isDigit longNum)]
+  readsPrec x ('S':'q':'^':'{':'\\':'{':seqlst) 
+    | let (digs,rst) = break (=='\\') seqlst
+      in ((take (length "\\}}") rst) == "\\}}") && (not $ null $ (readsPrec x $ "[" ++ digs ++ "]" :: [([Int],String)])) = 
+         let (digs,rst) = break (=='\\') seqlst
+         in let [(sm,"")] = readsPrec x $ "[" ++ digs ++ "]"
+         in [(Sq sm,drop (length "\\}}") rst)]
+  readsPrec _ _ = []
+                                               
 type SteenrodAlgebra = FreeModule SteenrodSquare ZMod2
 
 instance AlgebraGenerator SteenrodSquare ZMod2 where
@@ -61,7 +74,7 @@ squaresInDegree i = map Sq $ concatMap (\j -> aft j i) [1..i]
           | i > j      = []
           | otherwise  = map (++[i]) $ concatMap (\k -> (aft k (j-i))) [2*i..j]
 
-serreCartanBasis j = let arr = admisArray j in \i -> if i <= j then arr!j else squaresInDegree i                 
+serreCartanBasis j = let arr = admisArray j in \i -> if i <= j then arr!i else squaresInDegree i                 
                                                                                 
 sq :: [Int] -> SteenrodAlgebra
 sq ns = decompAdmis $ Sq ns

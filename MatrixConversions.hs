@@ -19,6 +19,8 @@ toArray matrix = array ((0,0),(Matrix.numRows matrix-1,Matrix.numColumns matrix-
                  | i <- [0..(Matrix.numRows matrix)-1],
                    j <- [0..(Matrix.numColumns matrix)-1]]
 
+toList matrix = elems $ toArray matrix
+
 fromArray matrix =  Matrix.fromList (m+1) (n+1) $ elems matrix
   where ((0,0),(m,n)) = bounds matrix
 

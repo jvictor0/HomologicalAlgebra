@@ -6,6 +6,7 @@ import FreeModule
 import qualified Data.Map as Map
 import Utils 
 import Data.List
+import Tensor
 
 class Graded g where
   grading :: g -> Int
@@ -23,6 +24,11 @@ totalGrading g = let (s,t) = biGrading g in s+t
 stableGrading :: (BiGraded g) => g -> Int
 stableGrading g = let (s,t) = biGrading g in s-t
 
+gradedSummand v = map fromAList 
+                    $ partitionsBy (\(g,r) -> grading g) $ toAList v
+
+biGradedSummand v = map fromAList 
+                    $ partitionsBy (\(g,r) -> biGrading g) $ toAList v
 
 
 instance (Graded g) => Graded (FreeModule g r) where
@@ -38,5 +44,6 @@ instance (BiGraded g) => BiGraded (FreeModule g r) where
     _   -> error "cannot get grading of nonhomogenious vector"
 
 
-
+instance (Graded s, Graded t) => Graded (Tensor s t) where
+  grading (Tensor s t) = (grading s) + (grading t)
 

@@ -46,4 +46,3 @@ stableHomotopyResSphere scbLim s t = extendResolution
                                0
                                t)
                               s t
-stableHomotopyResExpandAndSave = resolutionExpandAndSave "stableHom.ext_data" (stableHomotopyResSphere 50 3 10)

@@ -43,7 +43,9 @@ resolutionExpandAndSave path res = do
   saveResolution path expanded
   resolutionExpandAndSave path expanded
 
-{-
+
+outputFileName = "E2DataFile.e2"
+
 loadE2Page :: Int -> IO (FreeResData a SteenrodSquare ZMod2)
 loadE2Page ld = do
   putStrLn $ "Loading E2 Page for t - s < " ++ (show $ ld + 1)
@@ -78,4 +80,3 @@ readE2Data lsts ld = FR {connectivity= 0,
                         }
   where tup = Map.fromList $ map (\(hed:terms) -> (unShow hed, sum $ map (toFModule . unShow) terms)) lsts
 
--}

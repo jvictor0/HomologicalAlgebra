@@ -24,6 +24,10 @@ totalGrading g = let (s,t) = biGrading g in s+t
 stableGrading :: (BiGraded g) => g -> Int
 stableGrading g = let (s,t) = biGrading g in s-t
 
+isHomogenious v 
+  | v == zero = True
+  | otherwise = let ((x,_):xs) = toAList v in all (\(y,_) -> grading y == grading x) xs
+
 gradedSummand v = map fromAList 
                     $ partitionsBy (\(g,r) -> grading g) $ toAList v
 

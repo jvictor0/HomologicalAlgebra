@@ -55,3 +55,7 @@ algebraMapkMatrix source_basis target_basis fn = Matrix.fromColumns (d-c) (b-a)
   (elems source_basis)
   where (a,b) = bounds source_basis
         (c,d) = bounds target_basis
+
+--for convinience
+(**>) :: (Ord r,AlgebraGenerator r k, Ord b) => r -> FreeModule b (FreeModule r k) -> FreeModule b (FreeModule r k)
+(**>) r g = ((toFModule r) `asCoefOf` g) *> g

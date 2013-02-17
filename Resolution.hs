@@ -18,6 +18,13 @@ import Debug.Trace
 import Algebra
 import Data.Char
 import Data.Maybe
+import Control.Monad.ST
+import Control.Monad
+import Data.Array.ST
+import qualified Subalgebra as SA
+import Data.STRef
+import Data.Array.IO
+import Data.IORef
 
 englishLetters :: [String]
 englishLetters = map return ['A'..'Z']
@@ -125,6 +132,46 @@ beginResolution rBasis augmentation augSubmodule conn internalDeg = result
                                 | s <- [1], t <- [conn..internalDeg]]
           }
 
+brunerResolution :: (Eq k, Ord r, AlgebraGenerator r k, Ring.C k, Show r, Show k) =>
+      (Int -> [r])  
+     -> (Int -> [FreeResolution (FreeModule r k)])
+     -> Int
+     -> Int
+     -> Int
+     ->Array (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k)))
+brunerResolution rBasis augKernel conn reslength internalDeg = runST $ do
+  result <- newArray ((1,conn),(reslength,internalDeg)) Map.empty :: ST s (STArray s (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
+  forM [conn..internalDeg] $ \t -> do
+    oldKer <- newSTRef $ augKernel t
+    forM [1..reslength] $ \s -> do
+      image <- newSTRef SA.zeroSpace
+      newKer <- newSTRef []
+      forM [conn..t-1] $ \t' -> do
+        gens <- fmap Map.toList $ readArray result (s,t')
+        forM gens $ \(g,dg) -> do
+          forM (rBasis $ t - t') $ \op -> do
+            i <- readSTRef image
+            let x  = op **> (toFModule g)
+                dx = op **> dg
+                red = SA.reduce (x+dx) i
+            if (isHomogenious red) && ((red == zero) || ((grading red) == s))
+              then do
+              modifySTRef newKer (red:)
+              else do
+              modifySTRef image (SA.insert red) 
+      cycs <- readSTRef  oldKer   
+      forM cycs $ \cyc -> do 
+        i <- readSTRef image
+        let dg = SA.reduce cyc i
+        when (not $ (isHomogenious dg) && ((dg == zero) || ((grading dg) == s))) $ do
+          oldgs <- readArray result (s,t)
+          modifyArray result (s,t) (Map.insert (ResGen s t (Map.size oldgs)) dg)
+          writeSTRef image $ SA.insert dg i
+      newOldKer <- readSTRef newKer
+      writeSTRef oldKer newOldKer              
+  freeze result    
+          
+            
 extendResolution :: (Field.C k, AlgebraGenerator s k, Ord s, Eq k, Show k, Show s)
                     => FreeResData a s k -> Int -> Int -> FreeResData a s k
 extendResolution old_res newLen newLID = result

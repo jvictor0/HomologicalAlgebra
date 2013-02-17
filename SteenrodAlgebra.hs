@@ -8,10 +8,12 @@ import Algebra
 import Utils
 import ZMod2
 import Data.Array
-import Data.List
+import Data.List hiding (sum)
 import Data.Char
 import qualified Algebra.Monoid as Monoid
 import Debug.Trace
+import GradedObject
+
 
 data SteenrodSquare = Sq [Int] deriving (Eq, Ord)
 
@@ -47,6 +49,9 @@ type SteenrodAlgebra = FreeModule SteenrodSquare ZMod2
 instance AlgebraGenerator SteenrodSquare ZMod2 where
   idt = toFModule $ Sq []
   (Sq x) <*> (Sq y) = decompAdmis $ Sq $ x ++ y
+
+instance Graded SteenrodSquare where
+  grading (Sq i) = sum i
 
 adem ::  Int -> Int -> FreeModule SteenrodSquare ZMod2
 adem i j = fromAList [(Sq $ filter (/=0) [i+j-k,k],

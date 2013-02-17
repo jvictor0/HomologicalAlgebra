@@ -74,6 +74,9 @@ toAList (FM v) = Map.toList v
 toFModule :: (Ord m, Ring.C r, Eq r) => m -> FreeModule m r
 toFModule m = fromAList [(m,one)]
 
+asCoefOf :: a -> FreeModule r a -> a
+asCoefOf r v = r 
+
 
 fromAList :: (Ord m,Ring.C r, Eq r) => [(m,r)] -> FreeModule m r
 fromAList ls  = FM $ Map.filter (/=zero) $ foldr (\(m,r) mp -> Map.insertWith (+) m r mp) Map.empty ls

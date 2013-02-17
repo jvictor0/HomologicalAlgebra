@@ -13,13 +13,24 @@ import qualified MatrixAlgorithms
 import qualified MatrixUtils
 import qualified Algebra.Module as Module
 
-data Tensor a b = Tensor a b deriving (Eq, Ord)
+data Tensor a b = Tensor a b deriving (Eq)
 
 instance (Show a, Show b) => Show (Tensor a b) where
   show (Tensor a b) = (rshow a) ++ "(x)" ++ (rshow b)
 
 instance (UnShow a, UnShow b) => UnShow (Tensor a b) where
   unShow str = let (a,b) = splitSubstr "(x)" str in Tensor (unShow a) (unShow b)
+
+instance (Read a, Read b) => Read (Tensor a b) where
+  readsPrec n str = (readsPrec n str) >>= (\(a,rst) -> 
+                                            (if (take (length "(x)") rst) == "(x)" then readsPrec n (drop (length "(x)") rst) else [])
+                                            >>= (\(b,rst') -> [(Tensor a b,rst')]))
+  
+
+instance (Ord a, Ord b) => Ord (Tensor a b) where
+  compare (Tensor a b) (Tensor c d) = case compare b d of
+    EQ -> compare a c
+    comp -> comp
 
 type FreeRTensor a b r = FreeModule (Tensor a b) r
 

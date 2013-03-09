@@ -159,7 +159,7 @@ brunerResolution rBasis augKernel conn reslength internalDeg = do
       writeFile ("partialExtData" ++ (show t) ++ ".dat")
         $ show $ array ((1,conn),(reslength,t-1))
         [((s',t'),res!(s',t')) | s' <- [1..reslength], t' <- [conn..t-1]]
-        putStrLn $ "t = " ++ (show t)
+      putStrLn $ "t = " ++ (show t)
     forM [1..reslength] $ \s -> do
       writeFile "progress.txt" (show (s,t))
       image <- newIORef SA.zeroSpace

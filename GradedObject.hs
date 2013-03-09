@@ -47,7 +47,6 @@ instance (BiGraded g) => BiGraded (FreeModule g r) where
     []  -> (0,0)
     _   -> error "cannot get grading of nonhomogenious vector"
 
-
 instance (Graded s, Graded t) => Graded (Tensor s t) where
   grading (Tensor s t) = (grading s) + (grading t)
 

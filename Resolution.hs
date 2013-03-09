@@ -37,7 +37,7 @@ class (Graded c) => Complex cData c where
   differential :: cData -> c -> c
 
 class (Complex cData c) => ContractibleComplex cData c where
-  contraction :: cData  -> c -> c
+  contraction :: cData -> c -> c
 
 --- ResGen for making Free Resolutions of modules
 data ResGen = ResGen Int Int Int deriving (Eq,Ord)
@@ -108,6 +108,17 @@ matrixAt resolution s t = induceMatrix (kBasisInDegree resolution s t 0) (kBasis
                           in (\g -> induceStructure $ (maybeZero (Map.lookup g gens_source)))
 
 
+imageAt res s t = SA.fromList baslst
+  where gens = Map.toList $ gensUpToMap res s t
+        baslst = concatMap (\(g,dg) -> map (\s -> ((toFModule s)`asCoefOf`dg)*>dg) $ rBasis $ t-(internalGrading g)) gens
+        rBasis = kBasisOfRing res
+
+reducibleImageAt res s t = SA.fromList baslst
+  where gens = Map.toList $ gensUpToMap res s t
+        baslst = concatMap (\(g,dg) -> map (\s -> (fromAList [(g,toFModule s)]) + (((toFModule s)`asCoefOf`dg)*>dg)) $ rBasis $ t-(internalGrading g)) gens
+        rBasis = kBasisOfRing res
+
+
 beginResolution :: (Eq k, Ord r, AlgebraGenerator r k, Field.C k) =>
       (Int -> [r])  
      -> (FreeResData a1 r k -> Int -> Map.Map ResGen a1)
@@ -143,10 +154,12 @@ brunerResolution rBasis augKernel conn reslength internalDeg = do
   result <- newArray ((1,conn),(reslength,internalDeg)) Map.empty :: IO(IOArray (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
   forM [conn..internalDeg] $ \t -> do
     oldKer <- newIORef $ augKernel t
-    when ((t`mod`10 == 0) && (t>1)) $ do
+    when True $ do
       res <- freeze result 
-      writeFile "partialExtData.dat" $ show $ res `asTypeOf` (array ((0,0),(0,0)) [])
-      putStrLn $ "printing at " ++ (show t)
+      writeFile ("partialExtData" ++ (show t) ++ ".dat")
+        $ show $ array ((1,conn),(reslength,t-1))
+        [((s',t'),res!(s',t')) | s' <- [1..reslength], t' <- [conn..t-1]]
+        putStrLn $ "t = " ++ (show t)
     forM [1..reslength] $ \s -> do
       writeFile "progress.txt" (show (s,t))
       image <- newIORef SA.zeroSpace
@@ -177,6 +190,8 @@ brunerResolution rBasis augKernel conn reslength internalDeg = do
   freeze result    
           
             
+
+
 extendResolution :: (Field.C k, AlgebraGenerator s k, Ord s, Eq k, Show k, Show s)
                     => FreeResData a s k -> Int -> Int -> FreeResData a s k
 extendResolution old_res newLen newLID = result

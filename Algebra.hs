@@ -33,7 +33,8 @@ import Tensor
 class (Ring.C k,Eq k, Ord g) => AlgebraGenerator g k where
   (<*>) :: g -> g -> FreeModule g k
   idt :: FreeModule g k
-  
+    
+
 
 instance (AlgebraGenerator m k, AlgebraGenerator n k) => AlgebraGenerator (Tensor m n) k where
   (Tensor x1 x2)<*>(Tensor y1 y2) = (x1<*>y1)`tensor`(x2<*>y2)

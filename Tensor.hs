@@ -12,6 +12,7 @@ import qualified Algebra.Ring as Ring
 import qualified MatrixAlgorithms
 import qualified MatrixUtils
 import qualified Algebra.Module as Module
+import Data.Maybe
 
 data Tensor a b = Tensor a b deriving (Eq)
 
@@ -41,7 +42,11 @@ instance (Eq k, Ord r, Ord m, Ring.C k, Ring.C (FreeModule r k)) => (Module.C (F
 
 tensor :: (Eq r, Ord b, Ord a, Ring.C r) =>
            FreeModule a r -> FreeModule b r -> FreeModule (Tensor a b) r
-tensor x y = fromAList [(Tensor a b,r*s) | (a,r) <- toAList x, (b,s) <- toAList y]
+tensor x y = fromAscUniqueAList $ concatMap (\(a,r) -> 
+                                              mapMaybe (\(b,s) -> let sr = s*r in
+                                                         if sr == zero then Nothing else Just (Tensor b a,sr))
+                                              $ toAList x)
+             $ toAList y
 
 tensor_k :: (Eq s, Eq t, Ring.C (FreeModule (Tensor s t) k), Ord t, Ord b, Eq k, Ord s, Ord a, Ring.C k)
             => FreeModule a (FreeModule s k) -> FreeModule b (FreeModule t k) 
@@ -73,11 +78,13 @@ tensorFlip_k v = vmap (\(Tensor x y, r) -> (Tensor y x, vmap (\(Tensor s t,x) ->
 
 induceStructure ::(Eq k, Ring.C k, Ord m, Ord r)
                   => (FreeModule m (FreeModule r k)) -> (FreeModule (Tensor r m) k)
-induceStructure v = sum $ map (\(m,a) -> tensor a (toFModule m)) $ toAList v
+induceStructure v = fromAscUniqueAList $ concatMap (\(m,a) -> map (\(s,k) -> (Tensor s m,k)) $ toAList a) $ toAList v
 
 reduceStructure :: (Eq r, Ord m', Ord m, Ring.C (FreeModule m r), Ring.C r) =>
      FreeModule (Tensor m m') r -> FreeModule m' (FreeModule m r)
-reduceStructure v = vmap (\(Tensor r m,k) -> (m,k*>(toFModule r))) v
+reduceStructure v = fromAscUniqueAList $
+                    map (\f@((Tensor _ m,_):_) -> (m,fromAscUniqueAList $ map (\(Tensor r _,k) -> (r,k)) f))
+                    $ groupBy (\(Tensor _ x,_) (Tensor _ y,_) -> x == y) $ toAList v
 
 induceMatrix :: (Eq r, Ord b, Ord a, Ring.C r,Ring.C (FreeModule a r))
                 => Array Int (Tensor a b) -> Array Int (Tensor a b) -> (b -> FreeModule (Tensor a b) r) -> Matrix.T r

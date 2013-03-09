@@ -2,6 +2,7 @@
 module Recursive where
 
 import Data.List
+import Control.DeepSeq
 
 class Recursive r where
   getChildren :: r -> [r]
@@ -14,6 +15,7 @@ class (Recursive r, Recursive s) => MuRecursive r s where
  muGetChildrenS :: r -> [s]
  muGetChildrenS  = snd . muGetChildren
 
+recursiveRNF r = r `seq` (if all ((==()).recursiveRNF) $ getChildren r then () else ())
 
 muMapTop :: (MuRecursive r s, MuRecursive s r) => (r -> r) -> (s -> s) -> r -> r
 muMapTop f g r = muRecChildren r' (map (muMapTop f g) rs,map (muMapTop g f) ss)

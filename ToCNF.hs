@@ -11,6 +11,9 @@ import PropFormula
 import Control.Monad.State
 import System.Process
 import Control.Monad
+import Control.DeepSeq
+import Control.Parallel
+import System.CPUTime
 
 type ToCNFState tag = State (Map.Map (PropFormula tag Bool ()) (PropFormula tag Bool ()))
 
@@ -32,7 +35,26 @@ label term
         (Just nlab) -> return $ pfNot nlab
       (Just lab) -> return lab
 
--- (iff (or a b) x) = (and (or (not x) a b) (or (and (not a) (not b)) x))
+pdeepseq x y = (rnf x) `pseq` y
+
+toCNFTime term = do
+ start <- term `pdeepseq` getCPUTime
+ let (topLevel,labels) = runState (mapM toCNF0 $ getChildren term) Map.empty
+ first <- (topLevel,labels) `pdeepseq` getCPUTime
+ let labiffs = concatMap (uncurry labiff) $ Map.toList labels
+       where  labiff intTerm lab 
+                | isAnd intTerm = (pfOr $ lab:(map pfNot $ getChildren intTerm)):
+                                  (map ((pfNot lab)|||) $ getChildren intTerm)
+                | isOr intTerm = (pfOr $ (pfNot lab):(getChildren intTerm)):
+                                 (map (lab|||) $ map pfNot $ getChildren intTerm)
+ second <- labiffs `pdeepseq` getCPUTime
+ let result = pfAnd $ topLevel ++ labiffs
+ end <- result `pdeepseq` getCPUTime
+ putStrLn $ "toplelevel made in " ++ (show ((fromIntegral (first - start)) / (10^12) :: Double)) ++ " secs"
+ putStrLn $ "labiffs made in " ++ (show ((fromIntegral (second - first)) / (10^12) :: Double)) ++ " secs"
+ putStrLn $ "result wrapped made in " ++ (show ((fromIntegral (end - second)) / (10^12) :: Double)) ++ " secs"
+ 
+  
 
 toCNF term 
   | isAnd term = pfAnd $ topLevel ++ labiffs

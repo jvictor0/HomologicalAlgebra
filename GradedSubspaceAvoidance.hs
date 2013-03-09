@@ -5,6 +5,7 @@ import NumericPrelude
 import Data.List hiding (sum,product)
 import Control.Monad.ST
 import Data.Array.ST hiding (unsafeFreeze)
+import Control.DeepSeq
 import Control.Monad
 import Data.STRef
 import Debug.Trace
@@ -34,6 +35,8 @@ import ToCNF
 import SAT
 import qualified Data.Set as Set
 import ZMod2
+import System.CPUTime
+
 
 data GSPAProblem r = GSPAP {
   avoidanceImage :: Array Int (Matrix.T r),
@@ -55,10 +58,8 @@ extendToRandomBasis l = do
   
 alignProblem prob = do
   newBases <- fmap (listArray (bounds $ avoidanceImage prob)) $
-              mapM extendToRandomBasis $ elems $ avoidanceImage prob 
-  print newBases
+              mapM extendToRandomBasis $ elems $ avoidanceImage prob
   let newInverse = fmap ((safeFromJust "alignProblem: it seems extendToRandom returned noninvertible matrix" ) . MatrixAlgorithms.inverse) newBases
-  print newInverse
   let newAlgGens = array (bounds $ algebraGenerators prob) $
                    map (\((i,j),gs) -> 
                          ((i,j),map (\g -> (newInverse!j)*g*(newBases!i)) gs))
@@ -127,8 +128,15 @@ makeWMatrix (k,p,l) hi hj = Matrix.fromColumns hi hj $
 
 
 hopefulDimensions prob = fmap (\m -> Matrix.numRows m - Matrix.numColumns m) $ avoidanceImage prob
+regularIndicies prob = fmap (\m -> let s = Set.fromList $ 
+                                           mapMaybe (\j -> 
+                                                      find (\i -> (Matrix.index m i j)/=zero) 
+                                                      [0..Matrix.numRows m -1]) 
+                                           [0..Matrix.numColumns m-1]
+                                   in filter (\i -> not $ Set.member i s) [0.. Matrix.numRows m-1])
+                       $ avoidanceImage prob
 
-makeSubmoduleConstraint (h,prob) = pfAnd $ map pfNot $ concatMap toList matList 
+makeSubmoduleConstraint (h,prob) = map pfNot $ concatMap toList matList 
   where matList = concatMap 
                   (\((i,j),ms) ->
                     zipWith 
@@ -141,23 +149,23 @@ makeSubmoduleConstraint (h,prob) = pfAnd $ map pfNot $ concatMap toList matList
 makeUpperTriangularConstraintsAt k i j hk = pfOr $ (pfAnd [pfNot $ gspapKBitVar k (i,j') | j' <- [j+1..minimum [i,hk-1]]]):
                                             [gspapKBitVar k (i',j) | i' <- [j..i-1]]
 
-makeUpperTriangularConstraints (h,prob) = pfAnd $ [makeUpperTriangularConstraintsAt k i j hk
-                                                   | (k,hk) <- assocs h, 
-                                                     i <- [0..Matrix.numRows ((avoidanceImage prob)!k) - Matrix.numColumns ((avoidanceImage prob)!k)-1],
-                                                     j <- [0..minimum[i,hk-1]]]
+makeUpperTriangularConstraints (h,prob) = [makeUpperTriangularConstraintsAt k i j hk
+                                          | (k,hk) <- assocs h, 
+                                            i <- [0..Matrix.numRows ((avoidanceImage prob)!k) - Matrix.numColumns ((avoidanceImage prob)!k)-1],
+                                            j <- [0..minimum[i,hk-1]]]
 
-makeNonIntersectionConstraints (h,prob) = pfAnd [pfOr $ (pfNot $ gspapHBitVar k j):
-                                                 [gspapKBitVar k (i,j)
-                                                 | i <- [j..Matrix.numRows ((avoidanceImage prob)!k) - Matrix.numColumns ((avoidanceImage prob)!k)-1]]
-                                                | (k,hk) <- assocs h, j <- [0..hk-1]]
+makeNonIntersectionConstraints (h,prob) = [pfOr $ (pfNot $ gspapHBitVar k j):
+                                           [gspapKBitVar k (i,j)
+                                           | i <- [j..Matrix.numRows ((avoidanceImage prob)!k) - Matrix.numColumns ((avoidanceImage prob)!k)-1]]
+                                          | (k,hk) <- assocs h, j <- [0..hk-1]]
                                           
-makeExtraZeroConstraints (h,prob) = pfAnd [(gspapHBitVar k j) ||| (pfNot $ gspapKBitVar k (i,j))
-                                           | (k,hk) <- assocs h, j <- [0..hk-1],
-                                             i <- [j..Matrix.numRows ((avoidanceImage prob)!k)-1]]
+makeExtraZeroConstraints (h,prob) = [(gspapHBitVar k j) ||| (pfNot $ gspapKBitVar k (i,j))
+                                    | (k,hk) <- assocs h, j <- [0..hk-1],
+                                      i <- [j..Matrix.numRows ((avoidanceImage prob)!k)-1]]
                                                                               
 allGSPAPConstraints prob = (pfAnd [gspapHBitVar h j | (h,hk) <- assocs h, j <- [0..hk-1]],
-                            pfAnd [makeUpperTriangularConstraints (h,prob),makeSubmoduleConstraint (h,prob),
-                                   makeNonIntersectionConstraints (h,prob),makeExtraZeroConstraints (h,prob)])
+                            pfAnd $ concat [makeUpperTriangularConstraints (h,prob),makeSubmoduleConstraint (h,prob),
+                                            makeNonIntersectionConstraints (h,prob),makeExtraZeroConstraints (h,prob)])
   where h = hopefulDimensions prob
 
 gradedSubspaceAvoidanceSAT prob = do
@@ -165,8 +173,13 @@ gradedSubspaceAvoidanceSAT prob = do
   (newBasis,newProb) <- alignProblem prob
   putStrLn "Generating Constraints"
   let (softs,constrs) = allGSPAPConstraints newProb
+  (softs,constrs) `deepseq` (putStrLn "Converting to CNF")
+  start <- getCPUTime
   let cnf_consts = toCNF constrs
-  putStrLn $ "there are " ++ (show $ length $ getChildren cnf_consts) ++ " hard CNF clauses"
+  end <- (cnf_consts `deepseq` getCPUTime)
+  let diff = (fromIntegral (end - start)) / (10^12) :: Double
+  putStrLn $ "CNF conversion took " ++ (show diff) ++ " secs" 
+  cnf_consts `deepseq` (putStrLn $ "there are " ++ (show $ length $ getChildren cnf_consts) ++ " hard CNF clauses")
   putStrLn $ "converting to DIMACS"
   let (numMap,(soft,hard)) = toPMAXDIMACS (softs,cnf_consts)
   putStrLn $ "there are " ++ (show $ Map.size numMap) ++ " SAT variables"
@@ -181,9 +194,9 @@ gradedSubspaceAvoidanceSAT prob = do
                                  $ makeKMatrix k (Matrix.numRows m)
                                  (Matrix.numRows m - Matrix.numColumns m)) 
                   $ assocs $ avoidanceImage prob
-      forM_ (zip ([0..]::[Int]) kmats) $ \(i,k) -> (print i) >> (putStrLn $Matrix.format k)
+{-      forM_ (zip ([0..]::[Int]) kmats) $ \(i,k) -> (print i) >> (putStrLn $Matrix.format k)
       putStrLn "These conditions are satisfied"
-      mapM_ print opts
+      mapM_ print opts-}
       putStrLn $ "dim_k(K_*) = " ++ (show $ length opts)
       return $ listArray (bounds newBasis) $ zipWith (*) (elems newBasis) kmats
   

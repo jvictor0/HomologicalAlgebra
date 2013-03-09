@@ -33,12 +33,20 @@ import qualified Data.Map as Map
 data FreeModule b r = FM (Map.Map b r) deriving (Eq,Ord)
 
 instance (Eq r,Ord b,Ring.C r) => AbelianGroup.C (FreeModule b r) where
-  (FM m1) + (FM m2) = FM $ Map.filter (/=zero) $ Map.unionWith (+) m1 m2
-  negate (FM m) = FM $ Map.map negate m
+  (+) (FM m1) (FM m2) = FM $ foldr (\(toAddB,r) mp -> 
+                                     Map.alter (\r2 -> case r2 of
+                                                   Nothing -> Just r
+                                                   (Just s) -> let sm = r + s in if sm == zero then Nothing else Just sm)
+                                     toAddB mp)
+                        larger $ Map.toList smaller
+    where [smaller,larger] = sortBy (compare `on` Map.size) [m1,m2]          
+  negate m = ((-1)`asCoefOf`m)*>m
   zero = FM Map.empty
   
 instance (Eq r,Ord m,Ring.C r) => Module.C r (FreeModule m r) where
-  r *> (FM m) = FM $ Map.filter (/=zero) $ Map.map (r*) m
+  r *> modu@(FM m) 
+    | r == one  = modu --we deal with Z/2 enough that, well..
+    | otherwise = FM $ Map.filter (/=zero) $ Map.map (r*) m
 
 instance (Ord m,Ring.C r, Eq r, Show m,Show r) => Show (FreeModule m r) where
   show v      
@@ -77,9 +85,17 @@ toFModule m = fromAList [(m,one)]
 asCoefOf :: a -> FreeModule r a -> a
 asCoefOf r v = r 
 
+withCoefOf :: FreeModule a r -> FreeModule b r -> FreeModule a r
+withCoefOf x y = x
+
+withCoefType :: FreeModule a r -> r -> FreeModule a r
+withCoefType x y = x
 
 fromAList :: (Ord m,Ring.C r, Eq r) => [(m,r)] -> FreeModule m r
 fromAList ls  = FM $ Map.filter (/=zero) $ foldr (\(m,r) mp -> Map.insertWith (+) m r mp) Map.empty ls
+
+fromAscUniqueAList ls = FM $ Map.fromAscList ls
+fromUniqueAList ls =  FM $ Map.fromList ls
 
 toBasisList m = map fst $ toAList m
 

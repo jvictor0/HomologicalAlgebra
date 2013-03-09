@@ -4,15 +4,16 @@ module MatrixConversions where
 import NumericPrelude 
 import qualified MathObj.Matrix as Matrix
 import Data.Array
-import Data.Array.ST
 import Control.Monad.ST
-import Data.Array.ST
+import Data.Array.ST hiding (unsafeThaw)
 import Control.Monad.ST
+import Data.Array.Unsafe
+
 
 -- thaws a Matrix to an STArray for matrix algorithms.  
 --thawMatrix :: (MArray u a m) => Matrix.T a -> m (u (Int,Int) a)
 thawMatrix :: Matrix.T a -> ST s (STArray s (Int,Int) a)
-thawMatrix matrix = thaw $ toArray matrix
+thawMatrix matrix = unsafeThaw $ toArray matrix
 
 toArray matrix = array ((0,0),(Matrix.numRows matrix-1,Matrix.numColumns matrix-1))
                  [((i,j),Matrix.index matrix i j)

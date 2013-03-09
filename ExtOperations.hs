@@ -16,12 +16,17 @@ import qualified MathObj.Matrix as Matrix
 import qualified Algebra.Field as Field
 import System.Random
 import ResolutionSaver
+import qualified Subalgebra as SA
+import qualified Data.Set as Set
 import SteenrodAlgebra
 import System.IO.Unsafe
 import ZMod2
 import ToCNF
 import Recursive 
 import ToCNF
+import Control.Monad.ST
+import Control.Monad
+
 
 -- we wish to take a resolution and make a subspace avoidnace problem
 makeGradedSubspaceAvoidanceProblem :: (Eq k, Field.C k, AlgebraGenerator s k, Show k)
@@ -36,6 +41,24 @@ makeGradedSubspaceAvoidanceProblem resolution alg_gens s lid = GSPAP {
   where imageAt t = MatrixAlgorithms.image $ matrixAt resolution (s+1) t
         multMapAt t t' = map (\sq -> linearMatrix (kBasisInDegree resolution s t 0) (kBasisInDegree resolution s t' 0) (sq*>))
                          $ alg_gens $ t' - t  
+
+makeAlignedGradedSubspaceAvoidanceProblem :: (Eq k, Field.C k, AlgebraGenerator s k, Show k, Ord k, Show s)
+                                             => FreeResData a s k -> (Int -> [FreeModule s k]) -> Int -> Int -> GSPAProblem k
+makeAlignedGradedSubspaceAvoidanceProblem resolution alg_gens s lid = GSPAP { avoidanceImage = avims, algebraGenerators = algMats}
+  where bases = listArray (0,lid) $ flip map [connectivity resolution..lid] $ \t -> 
+          let imag = SA.fromList $ map (\b -> differential resolution $ reduceStructure $ (toFModule b)`withCoefOf`(head $ alg_gens 0))
+                     $ elems $ kBasisInDegree resolution (s+1) t 0 
+          in (SA.toList imag, SA.fillOutSpace imag $ elems $ kBasisInDegree resolution s t 0)
+        algMats = listArray ((0,0),(lid,lid)) $ flip map [(t,t') | t <- [0..lid], t' <- [0..lid]] $ \(t,t') -> 
+          flip map (alg_gens $ t'-t) $ \sq ->
+            let (iset,ss) = bases!t
+                (iset',ss') = bases!t' 
+              in SA.toMatrix ss ss' (sq*>)
+        avims = listArray (0,lid) $ flip map [0..lid] $ \t -> 
+          Matrix.fromColumns (SA.size $ snd $ bases!t) (length $ fst $ bases!t) $
+          flip map (fst $ bases!t) $ \ b -> 
+          map (\c -> if c == b then 1 else 0) (SA.toList $ snd $ bases!t)
+        
 
 myRes = unsafePerformIO $ loadE2Page 20
 myProb = unsafePerformIO $ do

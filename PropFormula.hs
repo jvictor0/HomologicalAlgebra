@@ -13,6 +13,7 @@ import ZMod2
 import qualified Algebra.Module as Module
 import qualified Algebra.Additive as Additive
 import qualified Algebra.Ring as Ring
+import Control.DeepSeq
 
 data PropFormula tag aux spec = PF aux (PFData tag aux spec) | PTrue | PFalse | PUndefined  deriving (Eq, Ord)
 data PFData tag aux special = And (Set.Set (PropFormula tag aux special)) |
@@ -91,7 +92,9 @@ instance (Normable a, Ord t, Ord s, Ord a) =>
   recChildren (PF v (Not _)) [n] = PF v $ Not n
   recChildren v _ = v
 
-
+instance (Normable a, Ord t, Ord s, Ord a) => 
+         NFData (PropFormula t a s) where
+  rnf = recursiveRNF
 
 instance (Recursive s, Ord t, Ord s, Ord a, Normable a)
          => MuRecursive (PropFormula t a s) s where
@@ -137,7 +140,7 @@ pfNot PTrue = PFalse
 pfNot PFalse = PTrue
 pfNot a 
   | isNot a   = head $ getChildren a
-  | isXOr a   = PTrue <+> a
+  | isXOr a   = let (PF _ (XOr s)) = a in wrapData $ XOr $ s+(toFModule PTrue)
   | isAnd a   = pfOr $ map pfNot $ getChildren a
   | isOr a    = pfAnd $ map pfNot $ getChildren a
   | otherwise = wrapData $ Not a
@@ -167,9 +170,9 @@ pfOr lst = if PTrue `elem` lst then PTrue else if null alist then PFalse else if
                   lst
 pfXOr :: (Ord t, Ord a, Ord s, AuxData a, Normable a) =>
          [PropFormula t a s] -> (PropFormula t a s)
-pfXOr lst = if null alist then PFalse else if null $ tail alist then head alist else wrapData $ XOr $  fromAList $ map (flip (,) 1) alist
-  where alist0 = concatMap (\t -> if isXOr t then getChildren t else [t]) $ filter (/=PFalse) lst
-        alist = concatMap (\tm-> if isNot tm then [head $ getChildren tm,PTrue] else [tm]) alist0
+pfXOr lst = if null alist then PFalse else if null $ tail alist then head alist else wrapData $ XOr $  fromAList $ map (flip (,) 1) alist0
+  where alist0 = concatMap (\t -> if isXOr t then getChildren t else [t]) alist
+        alist = concatMap (\tm-> if isNot tm then [head $ getChildren tm,PTrue] else [tm]) $ filter (/=PFalse) lst
 
 
 instance (Normable a,Ord t, Ord a, Ord s, AuxData a)

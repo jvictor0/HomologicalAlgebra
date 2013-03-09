@@ -37,7 +37,7 @@ class (Graded c) => Complex cData c where
   differential :: cData -> c -> c
 
 class (Complex cData c) => ContractibleComplex cData c where
-  contraction :: cData  -> c -> c
+  contraction :: cData -> c -> c
 
 --- ResGen for making Free Resolutions of modules
 data ResGen = ResGen Int Int Int deriving (Eq,Ord)
@@ -108,6 +108,17 @@ matrixAt resolution s t = induceMatrix (kBasisInDegree resolution s t 0) (kBasis
                           in (\g -> induceStructure $ (maybeZero (Map.lookup g gens_source)))
 
 
+imageAt res s t = SA.fromList baslst
+  where gens = Map.toList $ gensUpToMap res s t
+        baslst = concatMap (\(g,dg) -> map (\s -> ((toFModule s)`asCoefOf`dg)*>dg) $ rBasis $ t-(internalGrading g)) gens
+        rBasis = kBasisOfRing res
+
+reducibleImageAt res s t = SA.fromList baslst
+  where gens = Map.toList $ gensUpToMap res s t
+        baslst = concatMap (\(g,dg) -> map (\s -> (fromAList [(g,toFModule s)]) + (((toFModule s)`asCoefOf`dg)*>dg)) $ rBasis $ t-(internalGrading g)) gens
+        rBasis = kBasisOfRing res
+
+
 beginResolution :: (Eq k, Ord r, AlgebraGenerator r k, Field.C k) =>
       (Int -> [r])  
      -> (FreeResData a1 r k -> Int -> Map.Map ResGen a1)
@@ -143,7 +154,7 @@ brunerResolution rBasis augKernel conn reslength internalDeg = runST $ do
   result <- newArray ((1,conn),(reslength,internalDeg)) Map.empty :: ST s (STArray s (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
   forM [conn..internalDeg] $ \t -> do
     oldKer <- newSTRef $ augKernel t
-    forM [1..reslength] $ \s -> do
+    forM [1..reslength] $ \s -> do      
       image <- newSTRef SA.zeroSpace
       newKer <- newSTRef []
       forM [conn..t-1] $ \t' -> do
@@ -172,6 +183,8 @@ brunerResolution rBasis augKernel conn reslength internalDeg = runST $ do
   freeze result    
           
             
+
+
 extendResolution :: (Field.C k, AlgebraGenerator s k, Ord s, Eq k, Show k, Show s)
                     => FreeResData a s k -> Int -> Int -> FreeResData a s k
 extendResolution old_res newLen newLID = result

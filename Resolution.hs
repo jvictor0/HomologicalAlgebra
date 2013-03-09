@@ -138,37 +138,42 @@ brunerResolution :: (Eq k, Ord r, AlgebraGenerator r k, Ring.C k, Show r, Show k
      -> Int
      -> Int
      -> Int
-     ->Array (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k)))
-brunerResolution rBasis augKernel conn reslength internalDeg = runST $ do
-  result <- newArray ((1,conn),(reslength,internalDeg)) Map.empty :: ST s (STArray s (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
+     -> IO (Array (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
+brunerResolution rBasis augKernel conn reslength internalDeg = do
+  result <- newArray ((1,conn),(reslength,internalDeg)) Map.empty :: IO(IOArray (Int,Int) (Map.Map ResGen (FreeResolution (FreeModule r k))))
   forM [conn..internalDeg] $ \t -> do
-    oldKer <- newSTRef $ augKernel t
+    oldKer <- newIORef $ augKernel t
+    when ((t`mod`10 == 0) && (t>1)) $ do
+      res <- freeze result 
+      writeFile "partialExtData.dat" $ show $ res `asTypeOf` (array ((0,0),(0,0)) [])
+      putStrLn $ "printing at " ++ (show t)
     forM [1..reslength] $ \s -> do
-      image <- newSTRef SA.zeroSpace
-      newKer <- newSTRef []
+      writeFile "progress.txt" (show (s,t))
+      image <- newIORef SA.zeroSpace
+      newKer <- newIORef []
       forM [conn..t-1] $ \t' -> do
         gens <- fmap Map.toList $ readArray result (s,t')
         forM gens $ \(g,dg) -> do
           forM (rBasis $ t - t') $ \op -> do
-            i <- readSTRef image
+            i <- readIORef image
             let x  = op **> (toFModule g)
                 dx = op **> dg
                 red = SA.reduce (x+dx) i
             if (isHomogenious red) && ((red == zero) || ((grading red) == s))
               then do
-              modifySTRef newKer (red:)
+              modifyIORef newKer (red:)
               else do
-              modifySTRef image (SA.insert red) 
-      cycs <- readSTRef  oldKer   
+              modifyIORef image (SA.insert red) 
+      cycs <- readIORef  oldKer   
       forM cycs $ \cyc -> do 
-        i <- readSTRef image
+        i <- readIORef image
         let dg = SA.reduce cyc i
         when (not $ (isHomogenious dg) && ((dg == zero) || ((grading dg) == s))) $ do
           oldgs <- readArray result (s,t)
           modifyArray result (s,t) (Map.insert (ResGen s t (Map.size oldgs)) dg)
-          writeSTRef image $ SA.insert dg i
-      newOldKer <- readSTRef newKer
-      writeSTRef oldKer newOldKer              
+          writeIORef image $ SA.insert dg i
+      newOldKer <- readIORef newKer
+      writeIORef oldKer newOldKer              
   freeze result    
           
             

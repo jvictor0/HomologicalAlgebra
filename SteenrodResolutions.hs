@@ -47,7 +47,7 @@ stableHomotopyResSphere scbLim s t = extendResolution
                                t)
                               s t
 
-stableHomotopyBrunerSphere ::  Int -> Int -> Array (Int,Int) (Map.Map ResGen (FreeResolution SteenrodAlgebra))
+stableHomotopyBrunerSphere ::  Int -> Int -> IO (Array (Int,Int) (Map.Map ResGen (FreeResolution SteenrodAlgebra)))
 stableHomotopyBrunerSphere s t = brunerResolution (serreCartanBasis $t+1) 
                                  (\i -> if powerOf 2 i
                                         then [(sq[i]) *> (toFModule $ ResGen 0 0 0)]
